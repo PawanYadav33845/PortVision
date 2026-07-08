@@ -1,15 +1,13 @@
 # 👁️ PortVision
 
-PortVision is a high-performance, asynchronous network reconnaissance and vulnerability detection engine built using Python. By utilizing non-blocking network sockets via `asyncio`, PortVision concurrently probes target networks for active service entry points, performs dual-stage banner grabbing, and cross-references discoveries against a local signature matrix to flag immediate protocol-level security risks.
+PortVision is a high-performance, asynchronous network reconnaissance, multi-protocol host discovery, and vulnerability triage engine built in Python. By leveraging non-blocking network sockets and subprocess execution via `asyncio`, PortVision can map out active devices across entire network subnets, probe open ports concurrently, perform banner metadata extraction, and export structured audit pipelines.
 
 ## 🚀 Core Features
-* **Asynchronous TCP Engine:** Fires concurrent connection requests via `asyncio.open_connection`, dropping total scan windows down to seconds.
-* **Dual-Stage Banner Grabbing:** Implements both passive listening and active newline carriage injections (`\r\n`) to force unannounced software signatures from quiet target systems.
-* **Vulnerability & Severity Triage:** Evaluates active ports and banner versions against a signature reference matrix to categorize threats (Low, Medium, High, Critical).
-* **Rich Terminal UI Dashboard:** Renders clean, color-coded interactive tabular outputs using the `Rich` framework directly in the terminal interface.
-* **Automated Audit Reports:** Automatically writes distinct, timestamped Markdown documentation summaries straight to a localized storage directory (`/reports`).
-* **Test-Driven Design:** Built alongside an isolated unit test suite leveraging `unittest.mock` to guarantee deterministic networking code execution.
-
+* **Multi-Protocol Network Discovery:** Implements concurrent, non-blocking ICMP ping sweeps to filter out dead space and identify active hosts across full CIDR blocks (e.g., `192.168.1.0/24`).
+* **Asynchronous TCP Engine:** Probes target ports simultaneously using `asyncio.open_connection`, completing massive scans in seconds.
+* **Vulnerability Reference Matrix:** Cross-references open ports and banner metadata to categorize risks (Low, Medium, High, Critical) with explicit remediation steps.
+* **Real-time Session Exporting:** Automatically serializes scan configurations, timelines, discovery metrics, and vulnerabilities into highly structured, schema-compliant JSON files (`/reports`).
+* **Automated Markdown Reporter:** Formats findings into high-visibility engineering tables and security summaries for human auditors.
 ---
 
 ## 🛠️ System Architecture

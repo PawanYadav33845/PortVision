@@ -17,7 +17,7 @@ console = Console()
 async def main():
     console.print(
         Panel.fit(
-            "[bold cyan]👁️  PORTVISION RECON V2 [/bold cyan]\n[dim]Asynchronous Multi-Protocol Discovery & Threat Analysis Suite[/dim]",
+            "[bold cyan]👁️  PORTVISION [/bold cyan]\n[dim]Asynchronous Multi-Protocol Discovery & Threat Analysis Suite[/dim]",
             border_style="cyan",
             padding=(1, 4)
         )
