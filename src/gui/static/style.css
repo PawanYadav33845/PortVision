@@ -6,6 +6,7 @@
     --accent-purple: #c084fc;
     --accent-green: #34d399;
     --accent-red: #f87171;
+    --accent-yellow: #facc15;
     --text-primary: #f8fafc;
     --text-secondary: #94a3b8;
     --font-heading: 'Space Grotesk', sans-serif;
@@ -126,7 +127,8 @@ body {
     gap: 6px;
 }
 
-.input-main { flex: 2; min-width: 280px; }
+.input-main { flex: 2; min-width: 260px; }
+.input-webhook { flex: 1.5; min-width: 220px; }
 
 label {
     font-size: 0.8rem;
@@ -232,6 +234,13 @@ input[type="text"]:focus, select:focus {
 .m-val.cyan { color: var(--accent-cyan); }
 .m-val.purple { color: var(--accent-purple); }
 .m-val.red { color: var(--accent-red); }
+
+.report-btns {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
 
 /* Grid Layout */
 .content-grid {

@@ -3,23 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PortVision Security Suite - Recon Dashboard</title>
+    <title>PortVision Security Suite - Modern Recon Dashboard</title>
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
     <div class="app-wrapper">
-        <!-- Top Navigation -->
+        <!-- Top Navigation Bar -->
         <header class="navbar">
             <div class="brand">
                 <div class="brand-logo">👁️</div>
                 <div class="brand-info">
-                    <h2>PORTVISION</h2>
-                    <span>Multi-Protocol Reconnaissance & Device Profiling Suite</span>
+                    <h2>PORTVISION v3.5</h2>
+                    <span>Multi-Protocol Recon, MAC OUI, Subnet Diffing & PDF Suite</span>
                 </div>
             </div>
             <div class="nav-right">
-                <span class="status-indicator" id="system-status"><span class="dot green"></span> System Ready</span>
+                <span class="status-indicator" id="system-status"><span class="dot green"></span> Engine Active</span>
             </div>
         </header>
 
@@ -28,8 +28,8 @@
             <!-- Scan Controls Glass Card -->
             <section class="glass-card control-card">
                 <div class="card-header">
-                    <h3>⚡ Initiate Network Reconnaissance & Device Profiling</h3>
-                    <p>Enter target hostname, IPv4 address, or CIDR network block (e.g., 192.168.1.0/24)</p>
+                    <h3>⚡ Initiate Reconnaissance & Device Profiling</h3>
+                    <p>Target hostname, IPv4 address, or CIDR network block (e.g., 192.168.1.0/24)</p>
                 </div>
                 
                 <div class="input-form">
@@ -63,11 +63,16 @@
                         </select>
                     </div>
 
+                    <div class="form-group input-webhook">
+                        <label for="webhook-input">Webhook Alert URL (Optional)</label>
+                        <input type="text" id="webhook-input" placeholder="https://hooks.slack.com/services/...">
+                    </div>
+
                     <div class="form-group toggle-group">
                         <label class="toggle-label">
                             <input type="checkbox" id="cve-toggle" checked>
                             <span class="toggle-custom"></span>
-                            Live CVE API Lookup
+                            Live CVE API
                         </label>
                     </div>
 
@@ -88,51 +93,54 @@
                 </div>
             </section>
 
-            <!-- Metrics Summary Grid -->
+            <!-- Metrics Summary Row -->
             <section class="metrics-row" id="metrics-section" style="display: none;">
                 <div class="metric-box">
-                    <span class="m-label">Live Devices</span>
+                    <span class="m-label">Live Devices Discovered</span>
                     <span class="m-val purple" id="m-hosts">0</span>
                 </div>
                 <div class="metric-box">
-                    <span class="m-label">Open Ports</span>
+                    <span class="m-label">Open Service Ports</span>
                     <span class="m-val cyan" id="m-ports">0</span>
                 </div>
                 <div class="metric-box">
-                    <span class="m-label">Critical / High Risks</span>
+                    <span class="m-label">Critical / High Vulnerabilities</span>
                     <span class="m-val red" id="m-vulns">0</span>
                 </div>
                 <div class="metric-box">
-                    <span class="m-label">Generated Reports</span>
+                    <span class="m-label">Export Audit Reports</span>
                     <div class="report-btns" id="report-download-pills">
                         <!-- Dynamic Report Download Buttons -->
                     </div>
                 </div>
             </section>
 
-            <!-- Results Section -->
+            <!-- Subnet Diff Banner -->
+            <div id="diff-widget-container"></div>
+
+            <!-- Content Grid -->
             <div class="content-grid">
-                <!-- Discovered Hosts & Services -->
+                <!-- Discovered Devices & Findings -->
                 <section class="glass-card main-results">
                     <div class="card-header">
-                        <h3>🔍 Discovered Device Findings</h3>
-                        <p>Device classification badges, open ports, banners, and security vulnerabilities</p>
+                        <h3>🔍 Discovered Network Infrastructure</h3>
+                        <p>Resolved Hostnames, MAC Vendors, Device Classification & Security Audit</p>
                     </div>
                     <div id="results-display" class="results-container">
                         <div class="empty-state">
                             <div class="empty-icon">📡</div>
-                            <p>No active scan results yet. Enter a target above and launch a scan.</p>
+                            <p>No active scan findings yet. Enter a target above and launch a scan.</p>
                         </div>
                     </div>
                 </section>
 
-                <!-- Live Engine Logs & Reports Drawer -->
+                <!-- Console Log & Reports Archive -->
                 <aside class="glass-card log-side">
                     <div class="card-header">
                         <h3>📜 Live Console Log</h3>
                     </div>
                     <div class="terminal-log" id="terminal-feed">
-                        <div class="log-line">[SYSTEM] PortVision Device Profiling Engine Ready.</div>
+                        <div class="log-line">[SYSTEM] PortVision v3.5 Recon Engine Active.</div>
                     </div>
 
                     <div class="card-header" style="margin-top: 24px;">
