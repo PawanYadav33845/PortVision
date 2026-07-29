@@ -15,8 +15,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application source
 COPY . .
 
-EXPOSE 8000
+EXPOSE 10000 8000
 
 ENV PYTHONUNBUFFERED=1
+ENV HOST=0.0.0.0
+ENV PORT=10000
 
 CMD ["python", "run.py", "--gui"]

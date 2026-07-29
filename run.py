@@ -32,25 +32,28 @@ from src.reporter.pdf_export import export_session_to_pdf
 
 console = Console()
 
-def find_available_port(default_port: int = 8000) -> int:
+def find_available_port(host: str = "0.0.0.0", default_port: int = 8000) -> int:
     """Checks if a port is in use and returns the next free port."""
     for p in range(default_port, default_port + 20):
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            if s.connect_ex(("127.0.0.1", p)) != 0:
+            if s.connect_ex((host if host != "0.0.0.0" else "127.0.0.1", p)) != 0:
                 return p
     return default_port
 
-def launch_gui_server(host: str = "127.0.0.1", port: int = 8000):
+def launch_gui_server(host: str = None, port: int = None):
     """Launches the Uvicorn ASGI server hosting the PortVision Web GUI."""
-    target_port = find_available_port(port)
+    bind_host = host or os.environ.get("HOST", "0.0.0.0")
+    bind_port = port or int(os.environ.get("PORT", 8000))
+    target_port = find_available_port(bind_host, bind_port)
+
     console.print(Panel.fit(
         f"[bold cyan]🌐 Launching PortVision Web GUI Server[/bold cyan]\n"
-        f"[green]Dashboard URL:[/green] [bold white]http://{host}:{target_port}[/bold white]\n"
+        f"[green]Binding Address:[/green] [bold white]http://{bind_host}:{target_port}[/bold white]\n"
         f"[dim]Press Ctrl+C in terminal to stop server[/dim]",
         border_style="cyan"
     ))
     import uvicorn
-    uvicorn.run("src.gui.app:app", host=host, port=target_port, reload=False)
+    uvicorn.run("src.gui.app:app", host=bind_host, port=target_port, reload=False)
 
 async def run_cli_scan(user_input: str, scan_mode: str, profile: str, lookup_cves: bool):
     try:
