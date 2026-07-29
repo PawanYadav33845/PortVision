@@ -3,7 +3,7 @@ from datetime import datetime
 
 def generate_markdown_report(target: str, scan_results: list) -> str:
     """
-    Compiles scan results and any flagged vulnerabilities into a structured Markdown report.
+    Compiles multi-protocol scan results and live/offline CVE findings into a structured Markdown report.
     """
     current_time = datetime.now()
     timestamp_str = current_time.strftime("%Y-%m-%d_%H-%M-%S")
@@ -15,48 +15,50 @@ def generate_markdown_report(target: str, scan_results: list) -> str:
     filename = f"scan_{target.replace('.', '_')}_{timestamp_str}.md"
     file_path = os.path.join(reports_dir, filename)
 
-    # Base Layout Structure
-    md_content = f"""# PortVision Scan Report
+    md_content = f"""# PortVision Recon Report
     
-## 📋 Scan Summary
-* **Target Host / IP:** `{target}`
-* **Scan Execution Time:** `{display_time}`
+## 📋 Execution Context
+* **Target Host / Scope:** `{target}`
+* **Scan Timestamp:** `{display_time}`
 * **Status:** Complete
 
 ---
 
-## 🔍 Discovered Services and Ports
-| Port | Status | Service Name | Banner / Version Metadata |
-| :--- | :--- | :--- | :--- |
+## 🔍 Discovered Infrastructure Ports & Services
+| Port | Protocol | Status | Service | Category | Banner Metadata |
+| :--- | :--- | :--- | :--- | :--- | :--- |
 """
 
-    # 1. Build the active ports table
     vulnerabilities_found = []
     for record in scan_results:
-        if record["status"] == "Open":
-            banner = record["banner"] if record["banner"] else "No banner responded"
-            md_content += f"| **{record['port']}** | `OPEN` | {record['service']} | *{banner}* |\n"
+        status = record.get("status", "Closed")
+        if "Open" in status:
+            banner = record.get("banner") if record.get("banner") else "No banner responded"
+            proto = record.get("protocol", "TCP")
+            category = record.get("category", "General")
             
-            # Keep track of flagged vulnerabilities for our next section
-            if record["vulnerability"]:
+            md_content += f"| **{record['port']}** | `{proto}` | `OPEN` | {record['service']} | {category} | *{banner}* |\n"
+            
+            if record.get("vulnerability"):
                 vulnerabilities_found.append(record["vulnerability"])
 
-    # 2. Append the Vulnerability Assessment Section if any threats matched
     if vulnerabilities_found:
-        md_content += "\n---\n\n## 🚨 Security Vulnerability Analysis\n"
-        md_content += "The following critical protocol-level or version-specific risks were detected on the target:\n\n"
+        md_content += "\n---\n\n## 🚨 Threat & CVE Vulnerability Findings\n\n"
         
         for vuln in vulnerabilities_found:
-            severity_badge = f"`CRITICAL`" if vuln["severity"] == "Critical" else f"`HIGH`" if vuln["severity"] == "High" else f"`MEDIUM`"
+            sev = vuln.get("severity", "Medium")
+            severity_badge = f"`CRITICAL`" if sev == "Critical" else f"`HIGH`" if sev == "High" else f"`MEDIUM`"
+            cve_id = vuln.get("cve_id")
+            cve_str = f" [{cve_id}]" if cve_id else ""
             
-            md_content += f"### ⚠️ {vuln['title']} ({severity_badge})\n"
-            md_content += f"* **Risk Description:** {vuln['description']}\n"
-            md_content += f"* **Remediation Plan:** {vuln['remediation']}\n\n"
+            md_content += f"### ⚠️ {vuln['title']}{cve_str} ({severity_badge})\n"
+            md_content += f"* **Risk Summary:** {vuln.get('description')}\n"
+            md_content += f"* **Remediation Action:** {vuln.get('remediation')}\n\n"
     else:
-        md_content += "\n---\n\n## ✅ Security Vulnerability Analysis\n"
-        md_content += "*No known vulnerability signatures or high-risk unencrypted protocols matched the active open ports.*"
+        md_content += "\n---\n\n## ✅ Security Analysis\n"
+        md_content += "*Zero high-risk vulnerability signatures or exposed unauthenticated protocols matched the active ports.*"
 
-    md_content += "\n\n---\n*Report automatically compiled by PortVision Recon Engine.*"
+    md_content += "\n\n---\n*Compiled automatically by PortVision Security Recon Engine.*"
 
     with open(file_path, "w", encoding="utf-8") as file:
         file.write(md_content)

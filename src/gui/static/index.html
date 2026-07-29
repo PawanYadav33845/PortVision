@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PortVision Security Suite - Recon Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <div class="app-wrapper">
+        <!-- Top Navigation -->
+        <header class="navbar">
+            <div class="brand">
+                <div class="brand-logo">👁️</div>
+                <div class="brand-info">
+                    <h2>PORTVISION</h2>
+                    <span>Multi-Protocol Reconnaissance & Threat Suite</span>
+                </div>
+            </div>
+            <div class="nav-right">
+                <span class="status-indicator" id="system-status"><span class="dot green"></span> System Ready</span>
+            </div>
+        </header>
+
+        <!-- Main Workspace -->
+        <main class="workspace">
+            <!-- Scan Controls Glass Card -->
+            <section class="glass-card control-card">
+                <div class="card-header">
+                    <h3>⚡ Initiate Network Reconnaissance</h3>
+                    <p>Enter target hostname, IPv4 address, or CIDR network block (e.g., 192.168.1.0/24)</p>
+                </div>
+                
+                <div class="input-form">
+                    <div class="form-group input-main">
+                        <label for="target-input">Target Scope / IP Address</label>
+                        <input type="text" id="target-input" placeholder="e.g. 127.0.0.1 or 192.168.1.0/24" value="127.0.0.1">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="mode-select">Scanning Protocol</label>
+                        <select id="mode-select">
+                            <option value="TCP" selected>TCP Connect (Standard)</option>
+                            <option value="UDP">UDP Probing (DNS, SNMP, NTP)</option>
+                            <option value="SYN">SYN Stealth (Raw Sockets)</option>
+                            <option value="COMBINED">Combined (TCP + UDP Dual Sweep)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group toggle-group">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="cve-toggle" checked>
+                            <span class="toggle-custom"></span>
+                            Live CVE API Lookup
+                        </label>
+                    </div>
+
+                    <button class="btn-primary" id="start-scan-btn">
+                        <span>🚀 Launch Scan</span>
+                    </button>
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="progress-wrapper" id="progress-container" style="display: none;">
+                    <div class="progress-bar-bg">
+                        <div class="progress-bar-fill" id="progress-fill" style="width: 0%;"></div>
+                    </div>
+                    <div class="progress-status">
+                        <span id="progress-text">Initializing engine...</span>
+                        <span id="progress-pct">0%</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Metrics Summary Grid -->
+            <section class="metrics-row" id="metrics-section" style="display: none;">
+                <div class="metric-box">
+                    <span class="m-label">Live Hosts</span>
+                    <span class="m-val purple" id="m-hosts">0</span>
+                </div>
+                <div class="metric-box">
+                    <span class="m-label">Open Ports</span>
+                    <span class="m-val cyan" id="m-ports">0</span>
+                </div>
+                <div class="metric-box">
+                    <span class="m-label">Critical / High Risks</span>
+                    <span class="m-val red" id="m-vulns">0</span>
+                </div>
+                <div class="metric-box">
+                    <span class="m-label">Generated Reports</span>
+                    <div class="report-btns" id="report-download-pills">
+                        <!-- Dynamic Report Download Buttons -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <div class="content-grid">
+                <!-- Discovered Hosts & Services -->
+                <section class="glass-card main-results">
+                    <div class="card-header">
+                        <h3>🔍 Discovered Network Findings</h3>
+                        <p>Live active ports, service banner signatures, and CVE threat matches</p>
+                    </div>
+                    <div id="results-display" class="results-container">
+                        <div class="empty-state">
+                            <div class="empty-icon">📡</div>
+                            <p>No active scan results yet. Enter a target above and launch a scan.</p>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Live Engine Logs & Reports Drawer -->
+                <aside class="glass-card log-side">
+                    <div class="card-header">
+                        <h3>📜 Live Console Log</h3>
+                    </div>
+                    <div class="terminal-log" id="terminal-feed">
+                        <div class="log-line">[SYSTEM] PortVision v2.0 GUI Engine Ready.</div>
+                    </div>
+
+                    <div class="card-header" style="margin-top: 24px;">
+                        <h3>📂 Report Archive</h3>
+                    </div>
+                    <div class="report-list" id="report-archive-list">
+                        <!-- Dynamic report list -->
+                    </div>
+                </aside>
+            </div>
+        </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

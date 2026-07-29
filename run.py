@@ -1,40 +1,59 @@
-import asyncio
+import os
 import sys
+import socket
+import argparse
+import asyncio
 from datetime import datetime
+
+# Enforce UTF-8 encoding on Windows console streams to prevent charmap UnicodeEncodeError
+if sys.platform == "win32":
+    try:
+        sys.stdout.reconfigure(encoding="utf-8")
+        sys.stderr.reconfigure(encoding="utf-8")
+    except Exception:
+        pass
+
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.progress import Progress, SpinnerColumn, TextColumn
 
-from src.utils.helpers import parse_network_range, get_common_ports
+from src.utils.helpers import parse_network_range, get_common_ports, get_udp_ports
 from src.core.discovery import run_network_sweep
 from src.core.scanner import run_port_scan
 from src.reporter.report_gen import generate_markdown_report
+from src.reporter.html_report import generate_html_executive_report
 from src.reporter.json_export import export_results_to_json
 
 console = Console()
 
-async def main():
-    console.print(
-        Panel.fit(
-            "[bold cyan]👁️  PORTVISION [/bold cyan]\n[dim]Asynchronous Multi-Protocol Discovery & Threat Analysis Suite[/dim]",
-            border_style="cyan",
-            padding=(1, 4)
-        )
-    )
-    
-    # Prompt accepts single IPs, host names, or CIDR blocks
-    user_input = console.input("\n[bold yellow]👉 Enter Target Host, IP, or Subnet Range (e.g., 192.168.1.0/24):[/bold yellow] ").strip()
-    if not user_input:
-        console.print("[red][-] Error: Target parameters cannot be blank.[/red]")
-        return
-        
+def find_available_port(default_port: int = 8000) -> int:
+    """Checks if a port is in use and returns the next free port."""
+    for p in range(default_port, default_port + 20):
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            if s.connect_ex(("127.0.0.1", p)) != 0:
+                return p
+    return default_port
+
+def launch_gui_server(host: str = "127.0.0.1", port: int = 8000):
+    """Launches the Uvicorn ASGI server hosting the PortVision Web GUI."""
+    target_port = find_available_port(port)
+    console.print(Panel.fit(
+        f"[bold cyan]🌐 Launching PortVision Web GUI Server[/bold cyan]\n"
+        f"[green]Dashboard URL:[/green] [bold white]http://{host}:{target_port}[/bold white]\n"
+        f"[dim]Press Ctrl+C in terminal to stop server[/dim]",
+        border_style="cyan"
+    ))
+    import uvicorn
+    uvicorn.run("src.gui.app:app", host=host, port=target_port, reload=False)
+
+async def run_cli_scan(user_input: str, scan_mode: str, lookup_cves: bool):
     try:
-        # 1. Target Expansion Phase
+        # 1. Target Expansion
         candidate_ips = parse_network_range(user_input)
-        console.print(f"[green][+] Scopes expanded successfully.[/green] Parsed [bold white]{len(candidate_ips)}[/bold white] network target addresses.")
-        
-        # 2. Asynchronous Network Sweep Context
+        console.print(f"[green][+] Scopes expanded successfully.[/green] Target addresses: [bold white]{len(candidate_ips)}[/bold white]")
+
+        # 2. ICMP Ping Sweep
         alive_hosts = []
         with Progress(
             SpinnerColumn("earth", speed=1.0),
@@ -42,86 +61,151 @@ async def main():
             transient=True,
             console=console
         ) as progress:
-            progress.add_task(description=f"[cyan]Executing concurrent ICMP sweeps across network range...[/cyan]", total=None)
+            progress.add_task(description="[cyan]Executing ICMP discovery sweeps...[/cyan]", total=None)
             alive_hosts = await run_network_sweep(candidate_ips)
-            
+
         if not alive_hosts:
-            console.print("\n[bold red][!] Network Sweep Complete: 0 live hosts responded to ping queries. Terminating process cleanly.[/bold red]")
+            console.print("\n[bold red][!] Sweep Complete: 0 live hosts responded. Process complete.[/bold red]")
             return
-            
-        console.print(f"[bold green][+] Network Discovery Active![/bold green] Found [bold white]{len(alive_hosts)}[/bold white] responding devices on subnet.")
-        
-        # Setup session block structure for JSON exporting
+
+        console.print(f"[bold green][+] Network Sweep Active![/bold green] Found [bold white]{len(alive_hosts)}[/bold white] live responding hosts.")
+
         session_capture = {
             "session_execution_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             "scanned_range": user_input,
             "hosts_discovered_count": len(alive_hosts),
             "network_discoveries": {}
         }
-        
-        ports_list = list(get_common_ports().keys())
-        
-        # 3. Micro-Scan Loop over discovered active hosts
+
+        # 3. Active Scanning Loop
         for host_ip in alive_hosts:
-            console.print(f"\n[bold magenta]▼ Commencing Active Scanning Loop against Host: {host_ip}[/bold magenta]")
-            
+            console.print(f"\n[bold magenta]▼ Scanning Host: {host_ip} ({scan_mode} mode)[/bold magenta]")
+
             with Progress(
                 SpinnerColumn("dots", speed=1.2),
                 TextColumn("[progress.description]{task.description}"),
                 transient=True,
                 console=console
             ) as progress:
-                progress.add_task(description=f"[dim cyan]Probing ports for {host_ip}...[/dim cyan]", total=None)
-                scan_results = await run_port_scan(host_ip, ports_list)
-                
-            # Build and fill terminal summary tables
-            table = Table(title=f"Service Log for {host_ip}", title_style="bold green", border_style="dim")
+                progress.add_task(description=f"[dim cyan]Probing ports on {host_ip}...[/dim cyan]", total=None)
+                scan_results = await run_port_scan(host_ip, ports_to_scan=[], scan_mode=scan_mode, lookup_cves=lookup_cves)
+
+            # Build Terminal Summary Table
+            table = Table(title=f"Service Findings for {host_ip}", title_style="bold green", border_style="dim")
             table.add_column("PORT", style="cyan")
+            table.add_column("PROTO", style="blue")
             table.add_column("STATUS")
             table.add_column("SERVICE")
-            table.add_column("BANNER METADATA", style="italic dim")
-            table.add_column("ALERT ANALYSIS")
-            
+            table.add_column("CATEGORY", style="dim")
+            table.add_column("BANNER / METADATA", style="italic dim")
+            table.add_column("SECURITY ANALYSIS")
+
             open_count = 0
             host_json_log = []
-            
+
             for record in scan_results:
-                if record["status"] == "Open":
+                status = record.get("status", "Closed")
+                if "Open" in status:
                     open_count += 1
                     vuln_display = "[green]✔ Clean[/green]"
                     
-                    if record["vulnerability"]:
-                        severity = record["vulnerability"]["severity"]
-                        color = "red" if severity in ["High", "Critical"] else "yellow"
-                        vuln_display = f"[{color}]⚠️ {record['vulnerability']['title']}[/{color}]"
-                        
-                    table.add_row(str(record["port"]), "[bold green]OPEN[/bold green]", record["service"], record["banner"] or "None", vuln_display)
+                    vuln = record.get("vulnerability")
+                    if vuln:
+                        sev = vuln.get("severity", "Medium")
+                        color = "red" if sev in ["High", "Critical"] else "yellow"
+                        cve_tag = f"[{vuln.get('cve_id')}] " if vuln.get("cve_id") else ""
+                        vuln_display = f"[{color}]⚠️ {cve_tag}{vuln['title']}[/{color}]"
+
+                    table.add_row(
+                        str(record["port"]),
+                        record.get("protocol", "TCP"),
+                        f"[bold green]{status.upper()}[/bold green]",
+                        record.get("service", "Unknown"),
+                        record.get("category", "General"),
+                        record.get("banner") or "None",
+                        vuln_display
+                    )
                     host_json_log.append(record)
-                    
+
             if open_count > 0:
                 console.print(table)
-                # Auto-generate markdown reports for any host with open entries
                 generate_markdown_report(host_ip, scan_results)
             else:
-                console.print(f"[dim yellow][*] Host {host_ip} responded to sweep but hosts zero open targeted ports.[/dim yellow]")
-                
-            # Document finding arrays to session capture dictionary
+                console.print(f"[dim yellow][*] Host {host_ip} responded to ping but has 0 open targeted ports.[/dim yellow]")
+
             session_capture["network_discoveries"][host_ip] = {
                 "open_ports_detected": open_count,
                 "findings": host_json_log
             }
-            
-        # 4. Finalizing Structural Document Pipeline Output
-        console.print("\n[cyan][*] Compiling structured system metrics database arrays...[/cyan]")
+
+        # 4. Generate Reports
+        console.print("\n[cyan][*] Compiling structured executive reports...[/cyan]")
         json_path = export_results_to_json(session_capture)
-        console.print(f"[bold green]✨ Data Pipeline Success![/bold green] Consolidated session log written safely to:\n[bold white]{json_path}[/bold white]\n")
+        html_path = generate_html_executive_report(session_capture)
         
+        console.print(f"[bold green]✨ Reports Generated Successfully![/bold green]")
+        console.print(f" 📄 Executive HTML Dashboard: [bold white]{html_path}[/bold white]")
+        console.print(f" 📊 JSON Session Data: [bold white]{json_path}[/bold white]\n")
+
     except Exception as err:
-        console.print(f"\n[bold red][-] Runtime Crash Exception Error Encountered: {err}")
+        console.print(f"\n[bold red][-] Exception Error Encountered: {err}[/bold red]")
+
+def main():
+    parser = argparse.ArgumentParser(description="PortVision Multi-Protocol Reconnaissance & Threat Suite")
+    parser.add_argument("--gui", action="store_true", help="Launch the Web GUI interface")
+    parser.add_argument("--target", type=str, help="Target host, IP, or CIDR range (e.g. 192.168.1.0/24)")
+    parser.add_argument("--mode", type=str, choices=["TCP", "UDP", "SYN", "COMBINED"], default="TCP", help="Scanning protocol mode")
+    parser.add_argument("--no-cve", action="store_true", help="Disable live online CVE API lookups")
+    args = parser.parse_args()
+
+    if args.gui:
+        launch_gui_server()
+        return
+
+    console.print(
+        Panel.fit(
+            "[bold cyan]👁️ PORTVISION v2.0 [/bold cyan]\n"
+            "[dim]Asynchronous Multi-Protocol Discovery, SYN Stealth, UDP Probing & Live CVE Suite[/dim]",
+            border_style="cyan",
+            padding=(1, 4)
+        )
+    )
+
+    user_input = args.target
+    if not user_input:
+        user_input = console.input("\n[bold yellow]👉 Enter Target Host, IP, or Subnet Range (e.g. 192.168.1.0/24):[/bold yellow] ").strip()
+        if not user_input:
+            console.print("[red][-] Error: Target parameter cannot be blank.[/red]")
+            return
+
+    scan_mode = args.mode
+    if not args.target:
+        console.print("\n[bold cyan]Select Protocol Scanning Mode:[/bold cyan]")
+        console.print("  [white]1.[/white] TCP Connect Scan (Default)")
+        console.print("  [white]2.[/white] Non-blocking UDP Probing (DNS, NTP, SNMP, SSDP)")
+        console.print("  [white]3.[/white] Raw Socket SYN Stealth Scan")
+        console.print("  [white]4.[/white] Combined Dual Sweep (TCP + UDP)")
+        console.print("  [white]5.[/white] Launch Web GUI Interface")
+        
+        mode_choice = console.input("\n[yellow]Choice [1-5] (default 1): [/yellow]").strip()
+        if mode_choice == "2":
+            scan_mode = "UDP"
+        elif mode_choice == "3":
+            scan_mode = "SYN"
+        elif mode_choice == "4":
+            scan_mode = "COMBINED"
+        elif mode_choice == "5":
+            launch_gui_server()
+            return
+        else:
+            scan_mode = "TCP"
+
+    lookup_cves = not args.no_cve
+    asyncio.run(run_cli_scan(user_input, scan_mode, lookup_cves))
 
 if __name__ == "__main__":
     try:
-        asyncio.run(main())
+        main()
     except KeyboardInterrupt:
-        console.print("\n[yellow]\n[-] Operation canceled cleanly by user input command request.[/yellow]")
+        console.print("\n[yellow]\n[-] Scan canceled cleanly by user.[/yellow]")
         sys.exit(0)
