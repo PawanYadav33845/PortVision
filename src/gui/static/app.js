@@ -95,19 +95,33 @@ document.addEventListener("DOMContentLoaded", () => {
         let totalRisks = 0;
         let htmlContent = "";
 
+        // Render Subnet Diff Widget if baseline exists
+        const diff = results.subnet_diff;
+        if (diff && (diff.new_hosts?.length || diff.newly_opened_ports?.length)) {
+            htmlContent += `
+                <div style="background: rgba(234, 179, 8, 0.15); border: 1px solid #eab308; padding: 12px 16px; border-radius: 10px; margin-bottom: 20px; font-size: 0.88rem;">
+                    <strong>🔄 Subnet Change Detection (vs baseline ${diff.baseline_timestamp}):</strong><br>
+                    ${diff.new_hosts?.length ? `• New Hosts Joined: <strong>${diff.new_hosts.join(', ')}</strong><br>` : ''}
+                    ${diff.newly_opened_ports?.length ? `• Newly Opened Ports: <strong>${diff.newly_opened_ports.map(p => `${p.ip}:${p.port}`).join(', ')}</strong>` : ''}
+                </div>
+            `;
+        }
+
         const discoveries = results.network_discoveries || {};
         for (const [hostIp, hostInfo] of Object.entries(discoveries)) {
             const findings = hostInfo.findings || [];
             const devBadge = hostInfo.device_badge || hostInfo.device_classification || "Generic Host";
             const deviceName = hostInfo.device_name ? ` (${hostInfo.device_name})` : '';
+            const macInfo = hostInfo.mac_address ? ` | MAC: ${hostInfo.mac_address} (${hostInfo.hardware_vendor || 'Vendor'})` : '';
             totalPorts += hostInfo.open_ports_detected || 0;
 
             htmlContent += `
                 <div style="margin-bottom: 20px; background: rgba(15, 23, 42, 0.6); padding: 16px; border-radius: 12px; border: 1px solid var(--border-card);">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                         <h4 style="color: var(--accent-cyan);">🖥️ Host: ${hostIp}<span style="color: var(--text-secondary); font-weight: 400; font-size: 0.9rem;">${deviceName}</span></h4>
                         <span style="background: rgba(56, 189, 248, 0.15); color: var(--accent-cyan); padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; border: 1px solid rgba(56, 189, 248, 0.3);">${devBadge}</span>
                     </div>
+                    <div style="font-size: 0.78rem; color: var(--text-secondary); margin-bottom: 10px;">${macInfo}</div>
             `;
 
             if (!findings.length) {
@@ -163,6 +177,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (results.reports) {
             reportDownloadPills.innerHTML = `
                 <a href="/api/reports/download/${results.reports.html_report}" target="_blank" class="btn-primary" style="padding: 6px 12px; font-size: 0.8rem;">📄 HTML Report</a>
+                <a href="/api/reports/download/${results.reports.pdf_report}" target="_blank" class="btn-primary" style="padding: 6px 12px; font-size: 0.8rem; background: #7c3aed;">📑 PDF Document</a>
                 <a href="/api/reports/download/${results.reports.json_report}" target="_blank" class="btn-primary" style="padding: 6px 12px; font-size: 0.8rem; background: #475569;">📊 JSON Data</a>
             `;
         }

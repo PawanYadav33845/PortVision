@@ -18,12 +18,15 @@ from src.core.scanner import run_port_scan
 from src.core.os_detect import detect_os_from_ttl
 from src.core.device_profile import classify_device_type, DEVICE_ICONS
 from src.core.hostname_resolver import resolve_device_hostname
+from src.core.mac_vendor import get_mac_from_arp, lookup_vendor_by_mac
+from src.core.subnet_diff import compute_subnet_diff
 from src.reporter.html_report import generate_html_executive_report
 from src.reporter.report_gen import generate_markdown_report
 from src.reporter.json_export import export_results_to_json
+from src.reporter.pdf_export import export_session_to_pdf
 from src.utils.alerts import send_webhook_alert
 
-app = FastAPI(title="PortVision Modern Recon Dashboard", version="3.0.0")
+app = FastAPI(title="PortVision Modern Recon Dashboard", version="3.5.0")
 
 STATIC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "static"))
 REPORTS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../reports"))
@@ -85,7 +88,7 @@ async def execute_scan_pipeline(target_input: str, scan_mode: str, profile: str,
         active_scan_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Scope expanded to {len(candidate_ips)} target IP addresses.")
         active_scan_state["progress"] = 15
 
-        active_scan_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Executing concurrent ping sweep & OS fingerprinting...")
+        active_scan_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Executing concurrent ping sweep & MAC resolution...")
         alive_hosts = await run_network_sweep(candidate_ips)
         active_scan_state["progress"] = 30
 
@@ -119,6 +122,8 @@ async def execute_scan_pipeline(target_input: str, scan_mode: str, profile: str,
             )
             
             os_data = detect_os_from_ttl(128 if host_ip.startswith("127.") or host_ip.startswith("192.") else 64)
+            mac_addr = get_mac_from_arp(host_ip)
+            vendor_name = lookup_vendor_by_mac(mac_addr)
             
             open_findings = [r for r in scan_results if "Open" in r.get("status", "")]
             open_count = len(open_findings)
@@ -127,7 +132,6 @@ async def execute_scan_pipeline(target_input: str, scan_mode: str, profile: str,
             all_banners = " ".join([f.get("banner", "") for f in open_findings if f.get("banner")])
             web_title = next((f.get("web_audit", {}).get("title") for f in open_findings if f.get("web_audit")), None)
 
-            # Resolve Device Hostname
             hostname = await resolve_device_hostname(host_ip, web_title=web_title)
             classified_type = classify_device_type(open_ports_list, all_banners)
             
@@ -139,15 +143,22 @@ async def execute_scan_pipeline(target_input: str, scan_mode: str, profile: str,
                 "device_classification": classified_type,
                 "device_badge": DEVICE_ICONS.get(classified_type, classified_type),
                 "os_fingerprint": os_data,
+                "mac_address": mac_addr or "N/A",
+                "hardware_vendor": vendor_name,
                 "open_ports_detected": open_count,
                 "findings": open_findings
             }
 
             active_scan_state["progress"] += step_progress
 
-        active_scan_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Compiling HTML & JSON executive reports...")
+        # Compute Subnet Diff vs baseline
+        subnet_diff = compute_subnet_diff(session_capture)
+        session_capture["subnet_diff"] = subnet_diff
+
+        active_scan_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Compiling HTML, PDF & JSON executive reports...")
         json_path = export_results_to_json(session_capture)
         html_path = generate_html_executive_report(session_capture)
+        pdf_path = export_session_to_pdf(session_capture)
 
         if webhook_url:
             active_scan_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Transmitting webhook notification alert...")
@@ -155,7 +166,8 @@ async def execute_scan_pipeline(target_input: str, scan_mode: str, profile: str,
 
         session_capture["reports"] = {
             "json_report": os.path.basename(json_path),
-            "html_report": os.path.basename(html_path)
+            "html_report": os.path.basename(html_path),
+            "pdf_report": os.path.basename(pdf_path)
         }
 
         active_scan_state["results"] = session_capture
@@ -172,7 +184,7 @@ async def list_reports():
     reports = []
     if os.path.exists(REPORTS_DIR):
         for f in os.listdir(REPORTS_DIR):
-            if f.endswith((".html", ".json", ".md")):
+            if f.endswith((".html", ".json", ".md", ".pdf.html")):
                 full_p = os.path.join(REPORTS_DIR, f)
                 reports.append({
                     "filename": f,

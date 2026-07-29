@@ -23,9 +23,12 @@ from src.core.discovery import run_network_sweep
 from src.core.scanner import run_port_scan
 from src.core.device_profile import classify_device_type, DEVICE_ICONS
 from src.core.hostname_resolver import resolve_device_hostname
+from src.core.mac_vendor import get_mac_from_arp, lookup_vendor_by_mac
+from src.core.subnet_diff import compute_subnet_diff
 from src.reporter.report_gen import generate_markdown_report
 from src.reporter.html_report import generate_html_executive_report
 from src.reporter.json_export import export_results_to_json
+from src.reporter.pdf_export import export_session_to_pdf
 
 console = Console()
 
@@ -55,7 +58,7 @@ async def run_cli_scan(user_input: str, scan_mode: str, profile: str, lookup_cve
         candidate_ips = parse_network_range(user_input)
         console.print(f"[green][+] Scopes expanded successfully.[/green] Target addresses: [bold white]{len(candidate_ips)}[/bold white]")
 
-        # 2. ICMP Ping Sweep
+        # 2. ICMP Ping Sweep & MAC Resolution
         alive_hosts = []
         with Progress(
             SpinnerColumn("earth", speed=1.0),
@@ -63,7 +66,7 @@ async def run_cli_scan(user_input: str, scan_mode: str, profile: str, lookup_cve
             transient=True,
             console=console
         ) as progress:
-            progress.add_task(description="[cyan]Executing ICMP discovery sweeps...[/cyan]", total=None)
+            progress.add_task(description="[cyan]Executing ICMP discovery sweeps & MAC resolution...[/cyan]", total=None)
             alive_hosts = await run_network_sweep(candidate_ips)
 
         if not alive_hosts:
@@ -116,11 +119,15 @@ async def run_cli_scan(user_input: str, scan_mode: str, profile: str, lookup_cve
                     host_json_log.append(record)
 
             hostname = await resolve_device_hostname(host_ip, web_title=web_title)
+            mac_addr = get_mac_from_arp(host_ip)
+            vendor_name = lookup_vendor_by_mac(mac_addr)
             classified_type = classify_device_type(open_ports_list, " ".join(all_banners))
             dev_badge = DEVICE_ICONS.get(classified_type, classified_type)
 
+            mac_str = f" | MAC: {mac_addr} ({vendor_name})" if mac_addr else ""
+
             # Build Terminal Summary Table
-            table = Table(title=f"Service Findings for {host_ip} ({hostname}) [{dev_badge}]", title_style="bold green", border_style="dim")
+            table = Table(title=f"Service Findings for {host_ip} ({hostname}){mac_str} [{dev_badge}]", title_style="bold green", border_style="dim")
             table.add_column("PORT", style="cyan")
             table.add_column("PROTO", style="blue")
             table.add_column("STATUS")
@@ -158,17 +165,31 @@ async def run_cli_scan(user_input: str, scan_mode: str, profile: str, lookup_cve
                 "device_name": hostname,
                 "device_classification": classified_type,
                 "device_badge": dev_badge,
+                "mac_address": mac_addr or "N/A",
+                "hardware_vendor": vendor_name,
                 "open_ports_detected": open_count,
                 "findings": host_json_log
             }
+
+        # Subnet Diff
+        subnet_diff = compute_subnet_diff(session_capture)
+        session_capture["subnet_diff"] = subnet_diff
+        if subnet_diff.get("new_hosts") or subnet_diff.get("newly_opened_ports"):
+            console.print("\n[bold yellow]🔄 Subnet Diff Alert:[/bold yellow]")
+            if subnet_diff["new_hosts"]:
+                console.print(f"  [yellow]• New Hosts Joined:[/yellow] {', '.join(subnet_diff['new_hosts'])}")
+            if subnet_diff["newly_opened_ports"]:
+                console.print(f"  [yellow]• Newly Opened Ports:[/yellow] {subnet_diff['newly_opened_ports']}")
 
         # 4. Generate Reports
         console.print("\n[cyan][*] Compiling structured executive reports...[/cyan]")
         json_path = export_results_to_json(session_capture)
         html_path = generate_html_executive_report(session_capture)
+        pdf_path = export_session_to_pdf(session_capture)
         
         console.print(f"[bold green]✨ Reports Generated Successfully![/bold green]")
         console.print(f" 📄 Executive HTML Dashboard: [bold white]{html_path}[/bold white]")
+        console.print(f" 📑 PDF Executive Document: [bold white]{pdf_path}[/bold white]")
         console.print(f" 📊 JSON Session Data: [bold white]{json_path}[/bold white]\n")
 
     except Exception as err:
@@ -189,8 +210,8 @@ def main():
 
     console.print(
         Panel.fit(
-            "[bold cyan]👁️ PORTVISION v3.0 [/bold cyan]\n"
-            "[dim]Multi-Protocol Reconnaissance, Hostname Resolution & Device Profiling Suite[/dim]",
+            "[bold cyan]👁️ PORTVISION v3.5 [/bold cyan]\n"
+            "[dim]Multi-Protocol Recon, MAC Vendor OUI, Subnet Diffing & PDF Suite[/dim]",
             border_style="cyan",
             padding=(1, 4)
         )
