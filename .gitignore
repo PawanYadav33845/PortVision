@@ -1,26 +1,27 @@
-# Byte-compiled / optimized / DLL files
+# Python Bytecode & Environments
 __pycache__/
 *.py[cod]
 *$py.class
-
-# Environments
-.venv/
+*.so
+.Python
+env/
 venv/
 ENV/
-env/
+build/
+dist/
+*.egg-info/
 
-# IDE / Editor files
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Output reports & local CVE cache
+# Generated Scan Reports & Disk Caches
 reports/*.html
 reports/*.json
 reports/*.md
+reports/*.pdf
+reports/*.pdf.html
 !reports/.gitkeep
+cve_cache.json
 
-# Operating System Files
+# Operating System & IDE Files
+.vscode/
+.idea/
 .DS_Store
 Thumbs.db

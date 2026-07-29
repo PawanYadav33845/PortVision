@@ -1,178 +1,136 @@
-# 👁️ PortVision Security Suite
+# 👁️ PortVision v3.5.0
 
-[![Python Version](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Build Status](https://img.shields.io/badge/tests-12%20passed-brightgreen.svg)]()
-[![FastAPI GUI](https://img.shields.io/badge/GUI-FastAPI%20%2B%20Glassmorphism-purple.svg)]()
+> **Multi-Protocol Reconnaissance, MAC Vendor OUI Resolution, Device Profiling & Subnet Diffing Suite**
 
-**PortVision** is a high-performance, asynchronous multi-protocol network discovery, port scanning, OS fingerprinting, and vulnerability triage engine built in Python.
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
+[![Version](https://img.shields.io/badge/version-3.5.0-cyan.svg)]()
+[![FastAPI](https://img.shields.io/badge/FastAPI-v0.100%2B-009688.svg)](https://fastapi.tiangolo.com/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-By leveraging `asyncio` non-blocking sockets, raw TCP SYN stealth capabilities, non-blocking UDP payload probes, live online CVE API lookups, and a FastAPI-powered Web GUI with dynamic port fallback, PortVision enables rapid network mapping, service auditing, and executive reporting.
+PortVision is an asynchronous, multi-protocol network reconnaissance suite designed for network administrators, security engineers, and DevOps teams. It combines rapid ICMP ping sweeps, multi-protocol port scanning (TCP Connect, UDP Probing, Raw SYN Stealth), multi-tier device hostname resolution, MAC address OUI vendor matching, historical subnet diffing, live CVE lookups, and executive report generation (HTML, PDF, JSON, Markdown) alongside a modern glassmorphic Web GUI.
 
 ---
 
 ## ✨ Key Features
 
-* **📡 Multi-Protocol Port Scanning**:
-  * **TCP Connect Scan**: Fast asynchronous TCP port connection engine.
-  * **Non-blocking UDP Probing**: Custom protocol payloads for DNS (53), NTP (123), SNMP (161), SSDP (1900), mDNS (5353), and NetBIOS (137).
-  * **TCP SYN Stealth Scan**: Low-profile raw TCP SYN scanning with automatic privilege detection and graceful TCP fallback.
-  * **Combined Dual Sweep**: Runs concurrent TCP and UDP discovery sweeps simultaneously.
-
-* **💻 OS Fingerprinting Engine**:
-  * Analyzes IP TTL (Time To Live) response values and TCP window parameters to classify operating systems (*Microsoft Windows*, *Linux/macOS*, *Cisco IOS / Network Routers*) and calculate network hop distance.
-
-* **🔍 Live CVE & Vulnerability Triage**:
-  * **Live Online CVE Lookups**: Regex product/version banner extractor that queries live vulnerability APIs (CIRCL CVE Search / NIST NVD) with caching.
-  * **Offline Signature Matrix**: Built-in detection rules for exposed Redis, Memcached, MongoDB, Docker/K8s APIs, Etcd, Hadoop YARN, RDP BlueKeep, Tomcat Ghostcat, Telnet, FTP, and SMB.
-
-* **🌐 Web Application & TLS Certificate Audit**:
-  * Extracts page `<title>`, `Server`, and `X-Powered-By` HTTP headers.
-  * Checks HTTP Security Headers (`Strict-Transport-Security`, `X-Frame-Options`, `CSP`).
-  * Audits SSL/TLS certificates on HTTPS ports (Issuer, Expiry date, Days remaining, Self-Signed warning).
-
-* **📢 Webhook Notification Engine**:
-  * Formats scan execution summaries and flagged Critical/High severity threats for automated transmission to Slack, Discord, or Telegram webhooks.
-
-* **⚡ Rate Limiting & Concurrency Controls**:
-  * Integrated `asyncio.Semaphore` rate-limiting control across concurrent port probes (`--concurrency 100`).
-
-* **📄 Executive HTML & Markdown Dashboard Reports**:
-  * Generates self-contained, print-to-PDF ready HTML executive dashboard reports (`reports/executive_report_*.html`).
-  * Serializes structured audit findings into schema-compliant JSON files (`reports/session_capture_*.json`).
-
-* **🌐 Modern Glassmorphism Web GUI**:
-  * Web interface powered by FastAPI & Uvicorn (`http://127.0.0.1:8000`).
-  * Automatic free-port fallback if port 8000 is occupied by another process.
-  * Features real-time scan progress monitoring, live console feeds, host cards, and 1-click report downloads.
+- **⚡ Multi-Protocol Scanning Engine**: Supports asynchronous TCP Connect, non-blocking UDP payload probing (DNS, NTP, SNMP, SSDP, NetBIOS), and raw TCP SYN stealth reconnaissance.
+- **🏷️ Multi-Tier Hostname Resolver**: Resolves hostnames via Reverse DNS PTR, NetBIOS node status queries (UDP 137), mDNS queries (UDP 5353), and HTTP Web Title fallbacks.
+- **🛜 MAC Address & Vendor OUI Lookup**: Queries local OS ARP tables to extract physical MAC addresses and matches OUI prefixes against an offline database (*Apple, Cisco, Raspberry Pi, VMware, Intel, HP, Dell, TP-Link*).
+- **🎯 Device Profiling & Classification (`--profile`)**: Automatically classifies targets into device types (*Router*, *Printer*, *IoT*, *NAS Storage*, *Database Server*, *Workstation*, *Web Server*) or uses `AUTO` mode to auto-target device-specific ports.
+- **🔄 Subnet Diffing & Change Tracking**: Compares active scans against historical session baselines to detect new hosts, offline hosts, newly opened ports, and remediated vulnerabilities.
+- **🌐 Glassmorphic Web GUI**: Built with FastAPI & Server-Sent Events (SSE) featuring real-time console streaming, visual device cards, and dynamic free-port fallback to avoid socket conflicts (`WinError 10048`).
+- **📑 Executive PDF & HTML Reporting**: Generates interactive HTML dashboards with `@media print` PDF styles and 1-click PDF download capabilities.
+- **🔔 Webhook Notification Alerts**: Sends instant threat alerts to Slack, Discord, or Telegram webhooks.
 
 ---
 
-## 🛠️ Project Structure
+## 🚀 Quick Start
 
-```text
-PortVision/
-│
-├── src/
-│   ├── core/
-│   │   ├── scanner.py          # Asynchronous multi-protocol scan manager & rate limiter
-│   │   ├── udp_scanner.py      # Non-blocking UDP probe engine (DNS, NTP, SNMP, SSDP)
-│   │   ├── syn_scanner.py      # Raw socket TCP SYN stealth scanner with fallback
-│   │   ├── discovery.py        # Asynchronous ICMP ping sweep module
-│   │   ├── banner_grab.py      # Service banner retrieval module
-│   │   ├── cve_lookup.py       # Live CIRCL CVE & NVD API lookup engine with caching
-│   │   ├── os_detect.py        # IP TTL response OS fingerprinting heuristics
-│   │   └── web_audit.py        # HTTP title/header & SSL/TLS certificate audit module
-│   │
-│   ├── gui/
-│   │   ├── app.py              # FastAPI Web GUI backend server
-│   │   └── static/             # Glassmorphism frontend UI (HTML, CSS, JS)
-│   │
-│   ├── utils/
-│   │   ├── helpers.py          # Target parser & 150+ TCP/UDP port mapping
-│   │   ├── vulns_db.py         # Offline vulnerability signature matrix
-│   │   └── alerts.py           # Webhook notification engine (Slack/Discord/Telegram)
-│   │
-│   └── reporter/
-│       ├── html_report.py      # Executive HTML dashboard report generator
-│       ├── report_gen.py       # Markdown report documentation generator
-│       └── json_export.py      # JSON session metrics serializer
-│
-├── tests/
-│   └── test_scanner.py         # Unit test suite (12 tests)
-│
-├── reports/                    # Auto-generated audit reports directory
-├── run.py                      # Core CLI & GUI entry point launcher
-├── requirements.txt            # Dependency manifest
-├── README.md                   # Documentation
-└── .gitignore                  # Git tracking rules
-```
-
----
-
-## ⚙️ Installation & Quick Start
-
-### 1. Clone the Repository
+### 1. Installation
+Clone the repository and install dependencies:
 ```bash
-git clone https://github.com/PawanYadav33845/PortVision.git
+git clone https://github.com/your-org/PortVision.git
 cd PortVision
-```
-
-### 2. Create Virtual Environment & Install Dependencies
-```bash
-python -m venv venv
-
-# On Windows:
-.\venv\Scripts\Activate.ps1
-
-# On Linux / macOS:
-source venv/bin/activate
-
 pip install -r requirements.txt
 ```
 
----
-
-## 🚀 Usage
-
-### 🌐 Option A: Launch the Web GUI Dashboard
+### 2. Launch Web GUI
+Start the interactive Web Dashboard:
 ```bash
 python run.py --gui
 ```
-Open your browser at **`http://127.0.0.1:8000`** (or the assigned fallback port displayed in the console) to access the interactive web interface.
+Navigate to **`http://127.0.0.1:8000`** in your web browser.
+
+### 3. Run CLI Scans
+
+- **Standard Subnet Scan**:
+  ```bash
+  python run.py --target 192.168.1.0/24
+  ```
+
+- **Smart Auto Device Profiling Scan**:
+  ```bash
+  python run.py --target 192.168.1.1 --profile AUTO
+  ```
+
+- **Targeted Router/Gateway Scan**:
+  ```bash
+  python run.py --target 192.168.1.1 --profile ROUTER
+  ```
+
+- **Raw SYN Stealth Scan** *(Requires OS Admin Privileges)*:
+  ```bash
+  python run.py --target 192.168.1.100 --mode SYN
+  ```
+
+- **UDP Payload Probe Sweep**:
+  ```bash
+  python run.py --target 192.168.1.1 --mode UDP
+  ```
 
 ---
 
-### 🖥️ Option B: Command Line Interface (CLI)
+## 🛠️ Architecture & Project Structure
 
-#### 1. Standard TCP Connect Scan
-```bash
-python run.py --target 127.0.0.1
-```
-
-#### 2. Scan an Entire Subnet (CIDR Block)
-```bash
-python run.py --target 192.168.1.0/24
-```
-
-#### 3. Non-blocking UDP Probing
-```bash
-python run.py --target 192.168.1.1 --mode UDP
-```
-
-#### 4. Raw TCP SYN Stealth Scan *(Requires Admin/Root)*
-```bash
-python run.py --target 192.168.1.1 --mode SYN
-```
-
-#### 5. Dual Sweep (TCP + UDP Combined)
-```bash
-python run.py --target 192.168.1.1 --mode COMBINED
-```
-
-#### 6. Interactive CLI Mode
-```bash
-python run.py
+```text
+PortVision/
+├── run.py                      # Main entry point launcher (CLI & Web GUI)
+├── requirements.txt            # Python package dependencies
+├── .gitignore                  # Git ignore rules for reports & caches
+├── src/
+│   ├── core/
+│   │   ├── scanner.py          # Asynchronous scan manager & semaphore pool
+│   │   ├── discovery.py        # ICMP ping sweep engine
+│   │   ├── udp_scanner.py      # Non-blocking UDP payload probing
+│   │   ├── syn_scanner.py      # Raw TCP SYN stealth scanner
+│   │   ├── hostname_resolver.py# Reverse DNS, NetBIOS & mDNS name resolver
+│   │   ├── mac_vendor.py       # ARP table parser & IEEE OUI vendor database
+│   │   ├── device_profile.py   # Device classification & profile port maps
+│   │   ├── os_detect.py        # IP TTL OS fingerprinting heuristics
+│   │   ├── web_audit.py        # HTTP headers & SSL/TLS certificate auditor
+│   │   ├── cve_lookup.py       # Live CIRCL CVE & NIST NVD lookup engine
+│   │   └── subnet_diff.py      # Historical scan session delta comparator
+│   ├── reporter/
+│   │   ├── html_report.py      # Executive HTML dashboard generator
+│   │   ├── pdf_export.py       # Printable PDF report generator
+│   │   ├── json_export.py      # JSON session capture exporter
+│   │   └── report_gen.py       # Markdown report generator
+│   ├── gui/
+│   │   ├── app.py              # FastAPI Web GUI backend server
+│   │   └── static/             # Glassmorphic frontend assets (HTML, CSS, JS)
+│   └── utils/
+│       ├── helpers.py          # 150+ port matrix & IP range parsers
+│       ├── vulns_db.py         # Offline vulnerability signature matrix
+│       └── alerts.py           # Webhook notification engine
+└── tests/
+    └── test_scanner.py         # Automated unit test suite
 ```
 
 ---
 
-## 🧪 Running Unit Tests
+## 📖 CLI Argument Reference
 
-Run the test suite to verify network parsers, scanners, and report generators:
+| Flag | Option | Description |
+| :--- | :--- | :--- |
+| `--gui` | Flag | Launches the FastAPI Web Dashboard interface. |
+| `--target` | String | Target IP address, hostname, or CIDR block (e.g. `192.168.1.0/24`). |
+| `--mode` | `TCP` / `UDP` / `SYN` / `COMBINED` | Protocol scanning mode (Default: `TCP`). |
+| `--profile` | `ALL` / `AUTO` / `ROUTER` / `PRINTER` / `IOT` / `NAS` / `DATABASE` / `WEB` / `WORKSTATION` | Targeted device port profile (Default: `ALL`). |
+| `--no-cve` | Flag | Disables live online CVE API lookups for offline environments. |
 
+---
+
+## 🧪 Running Automated Unit Tests
+
+Execute the 11-test suite to verify core engines:
 ```bash
 python -m unittest discover -s tests
 ```
 
 ---
 
-## 📝 License
+## 📜 License & Legal Disclaimer
 
-Distributed under the MIT License. See `LICENSE` for more information.
+This tool is released under the **MIT License**.
 
----
-
-## ⚠️ Disclaimer
-
-PortVision is designed for legitimate security auditing, network administration, and authorized penetration testing. Always obtain explicit authorization before scanning networks or targets you do not own.
+> **Disclaimer**: PortVision is intended exclusively for authorized network inventory, security auditing, and defensive infrastructure management. Users must ensure compliance with all applicable laws and obtain proper authorization before scanning remote targets.
