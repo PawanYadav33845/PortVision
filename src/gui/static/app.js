@@ -99,12 +99,13 @@ document.addEventListener("DOMContentLoaded", () => {
         for (const [hostIp, hostInfo] of Object.entries(discoveries)) {
             const findings = hostInfo.findings || [];
             const devBadge = hostInfo.device_badge || hostInfo.device_classification || "Generic Host";
+            const deviceName = hostInfo.device_name ? ` (${hostInfo.device_name})` : '';
             totalPorts += hostInfo.open_ports_detected || 0;
 
             htmlContent += `
                 <div style="margin-bottom: 20px; background: rgba(15, 23, 42, 0.6); padding: 16px; border-radius: 12px; border: 1px solid var(--border-card);">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
-                        <h4 style="color: var(--accent-cyan);">Host: ${hostIp} (${hostInfo.open_ports_detected} Open Ports)</h4>
+                        <h4 style="color: var(--accent-cyan);">🖥️ Host: ${hostIp}<span style="color: var(--text-secondary); font-weight: 400; font-size: 0.9rem;">${deviceName}</span></h4>
                         <span style="background: rgba(56, 189, 248, 0.15); color: var(--accent-cyan); padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; border: 1px solid rgba(56, 189, 248, 0.3);">${devBadge}</span>
                     </div>
             `;

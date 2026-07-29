@@ -22,6 +22,7 @@ from src.utils.helpers import parse_network_range, get_common_ports, get_udp_por
 from src.core.discovery import run_network_sweep
 from src.core.scanner import run_port_scan
 from src.core.device_profile import classify_device_type, DEVICE_ICONS
+from src.core.hostname_resolver import resolve_device_hostname
 from src.reporter.report_gen import generate_markdown_report
 from src.reporter.html_report import generate_html_executive_report
 from src.reporter.json_export import export_results_to_json
@@ -101,6 +102,7 @@ async def run_cli_scan(user_input: str, scan_mode: str, profile: str, lookup_cve
             host_json_log = []
             open_ports_list = []
             all_banners = []
+            web_title = None
 
             for record in scan_results:
                 status = record.get("status", "Closed")
@@ -109,13 +111,16 @@ async def run_cli_scan(user_input: str, scan_mode: str, profile: str, lookup_cve
                     open_ports_list.append(record["port"])
                     if record.get("banner"):
                         all_banners.append(record["banner"])
+                    if record.get("web_audit") and record["web_audit"].get("title"):
+                        web_title = record["web_audit"]["title"]
                     host_json_log.append(record)
 
+            hostname = await resolve_device_hostname(host_ip, web_title=web_title)
             classified_type = classify_device_type(open_ports_list, " ".join(all_banners))
             dev_badge = DEVICE_ICONS.get(classified_type, classified_type)
 
             # Build Terminal Summary Table
-            table = Table(title=f"Service Findings for {host_ip} [{dev_badge}]", title_style="bold green", border_style="dim")
+            table = Table(title=f"Service Findings for {host_ip} ({hostname}) [{dev_badge}]", title_style="bold green", border_style="dim")
             table.add_column("PORT", style="cyan")
             table.add_column("PROTO", style="blue")
             table.add_column("STATUS")
@@ -147,9 +152,10 @@ async def run_cli_scan(user_input: str, scan_mode: str, profile: str, lookup_cve
                 console.print(table)
                 generate_markdown_report(host_ip, scan_results)
             else:
-                console.print(f"[dim yellow][*] Host {host_ip} ({dev_badge}) responded to ping but hosts 0 open ports for profile '{profile}'.[/dim yellow]")
+                console.print(f"[dim yellow][*] Host {host_ip} ({hostname}) responded to ping but hosts 0 open ports for profile '{profile}'.[/dim yellow]")
 
             session_capture["network_discoveries"][host_ip] = {
+                "device_name": hostname,
                 "device_classification": classified_type,
                 "device_badge": dev_badge,
                 "open_ports_detected": open_count,
@@ -183,8 +189,8 @@ def main():
 
     console.print(
         Panel.fit(
-            "[bold cyan]👁️ PORTVISION v2.8 [/bold cyan]\n"
-            "[dim]Multi-Protocol Discovery, SYN Stealth, Device Profiling & Live CVE Suite[/dim]",
+            "[bold cyan]👁️ PORTVISION v3.0 [/bold cyan]\n"
+            "[dim]Multi-Protocol Reconnaissance, Hostname Resolution & Device Profiling Suite[/dim]",
             border_style="cyan",
             padding=(1, 4)
         )

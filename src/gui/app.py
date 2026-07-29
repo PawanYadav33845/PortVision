@@ -17,12 +17,13 @@ from src.core.discovery import run_network_sweep
 from src.core.scanner import run_port_scan
 from src.core.os_detect import detect_os_from_ttl
 from src.core.device_profile import classify_device_type, DEVICE_ICONS
+from src.core.hostname_resolver import resolve_device_hostname
 from src.reporter.html_report import generate_html_executive_report
 from src.reporter.report_gen import generate_markdown_report
 from src.reporter.json_export import export_results_to_json
 from src.utils.alerts import send_webhook_alert
 
-app = FastAPI(title="PortVision Modern Recon Dashboard", version="2.8.0")
+app = FastAPI(title="PortVision Modern Recon Dashboard", version="3.0.0")
 
 STATIC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "static"))
 REPORTS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../reports"))
@@ -42,8 +43,8 @@ active_scan_state = {
 
 class ScanRequest(BaseModel):
     target: str
-    scan_mode: str = "TCP"  # TCP, UDP, SYN, COMBINED
-    profile: str = "ALL"    # ALL, ROUTER, PRINTER, IOT, NAS, DATABASE, WEB, WORKSTATION, AUTO
+    scan_mode: str = "TCP"
+    profile: str = "ALL"
     lookup_cves: bool = True
     concurrency: int = 100
     webhook_url: Optional[str] = None
@@ -124,12 +125,17 @@ async def execute_scan_pipeline(target_input: str, scan_mode: str, profile: str,
 
             open_ports_list = [f.get("port") for f in open_findings]
             all_banners = " ".join([f.get("banner", "") for f in open_findings if f.get("banner")])
+            web_title = next((f.get("web_audit", {}).get("title") for f in open_findings if f.get("web_audit")), None)
+
+            # Resolve Device Hostname
+            hostname = await resolve_device_hostname(host_ip, web_title=web_title)
             classified_type = classify_device_type(open_ports_list, all_banners)
             
             if open_count > 0:
                 generate_markdown_report(host_ip, scan_results)
 
             session_capture["network_discoveries"][host_ip] = {
+                "device_name": hostname,
                 "device_classification": classified_type,
                 "device_badge": DEVICE_ICONS.get(classified_type, classified_type),
                 "os_fingerprint": os_data,

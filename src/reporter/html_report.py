@@ -6,7 +6,7 @@ from src.core.device_profile import classify_device_type, DEVICE_ICONS
 def generate_html_executive_report(session_data: dict) -> str:
     """
     Renders a modern, single-file HTML executive dashboard report from scan session metrics.
-    Includes Device Type Classification badges, OS fingerprinting metrics, and Web/TLS audit details.
+    Includes resolved Device Hostnames, Device Type Classification badges, OS fingerprinting, and Web/TLS audit details.
     """
     reports_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../reports"))
     os.makedirs(reports_dir, exist_ok=True)
@@ -148,6 +148,8 @@ def generate_html_executive_report(session_data: dict) -> str:
         }}
 
         .host-ip {{ font-size: 1.1rem; font-weight: 600; }}
+        .hostname-tag {{ color: var(--text-muted); font-size: 0.9rem; margin-left: 6px; font-weight: 400; }}
+
         .os-badge {{
             background: rgba(168, 85, 247, 0.15);
             color: #d8b4fe;
@@ -263,6 +265,7 @@ def generate_html_executive_report(session_data: dict) -> str:
         findings = host_info.get("findings", [])
         open_count = host_info.get("open_ports_detected", 0)
         os_data = host_info.get("os_fingerprint") or {"os_family": "Generic Host"}
+        hostname = host_info.get("device_name") or "Unresolved Hostname"
 
         open_ports_list = [f.get("port") for f in findings if f.get("port")]
         all_banners = " ".join([f.get("banner", "") for f in findings if f.get("banner")])
@@ -273,7 +276,8 @@ def generate_html_executive_report(session_data: dict) -> str:
         <div class="host-card">
             <div class="host-header">
                 <div>
-                    <span class="host-ip">🖥️ Target Host: {host_ip}</span>
+                    <span class="host-ip">🖥️ {host_ip}</span>
+                    <span class="hostname-tag">({hostname})</span>
                     <span class="dev-badge" style="margin-left: 10px;">{dev_badge_text}</span>
                     <span class="os-badge" style="margin-left: 6px;">💻 OS: {os_data.get('os_family')}</span>
                 </div>
