@@ -5,9 +5,19 @@
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
 [![Version](https://img.shields.io/badge/version-3.5.0-cyan.svg)]()
 [![FastAPI](https://img.shields.io/badge/FastAPI-v0.100%2B-009688.svg)](https://fastapi.tiangolo.com/)
+[![GitHub Package](https://img.shields.io/badge/GHCR-Docker%20Container-blue?logo=docker)](https://github.com/PawanYadav33845/PortVision/pkgs/container/portvision)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-PortVision is an asynchronous, multi-protocol network reconnaissance suite designed for network administrators, security engineers, and DevOps teams. It combines rapid ICMP ping sweeps, multi-protocol port scanning (TCP Connect, UDP Probing, Raw SYN Stealth), multi-tier device hostname resolution, MAC address OUI vendor matching, historical subnet diffing, live CVE lookups, and executive report generation (HTML, PDF, JSON, Markdown) alongside a modern glassmorphic Web GUI.
+---
+
+## 🌐 Live Demo & Deployment
+
+- 🐳 **GitHub Container Registry (GHCR)**:
+  ```bash
+  docker run -d -p 8000:8000 ghcr.io/pawanyadav33845/portvision:latest
+  ```
+- 🔗 **GitHub Repository**: [https://github.com/PawanYadav33845/PortVision](https://github.com/PawanYadav33845/PortVision)
+- 🚀 **Live Web App Demo**: Launch locally via `python run.py --gui` or host on Render / Cloud using the provided Docker container!
 
 ---
 
@@ -29,7 +39,7 @@ PortVision is an asynchronous, multi-protocol network reconnaissance suite desig
 ### 1. Installation
 Clone the repository and install dependencies:
 ```bash
-git clone https://github.com/your-org/PortVision.git
+git clone https://github.com/PawanYadav33845/PortVision.git
 cd PortVision
 pip install -r requirements.txt
 ```
@@ -75,6 +85,8 @@ Navigate to **`http://127.0.0.1:8000`** in your web browser.
 ```text
 PortVision/
 ├── run.py                      # Main entry point launcher (CLI & Web GUI)
+├── Dockerfile                  # Container build specification
+├── .github/workflows/deploy.yml# Automated GHCR CI/CD build pipeline
 ├── requirements.txt            # Python package dependencies
 ├── .gitignore                  # Git ignore rules for reports & caches
 ├── src/
