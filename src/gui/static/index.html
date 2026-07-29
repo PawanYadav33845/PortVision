@@ -15,7 +15,7 @@
                 <div class="brand-logo">👁️</div>
                 <div class="brand-info">
                     <h2>PORTVISION</h2>
-                    <span>Multi-Protocol Reconnaissance & Threat Suite</span>
+                    <span>Multi-Protocol Reconnaissance & Device Profiling Suite</span>
                 </div>
             </div>
             <div class="nav-right">
@@ -28,7 +28,7 @@
             <!-- Scan Controls Glass Card -->
             <section class="glass-card control-card">
                 <div class="card-header">
-                    <h3>⚡ Initiate Network Reconnaissance</h3>
+                    <h3>⚡ Initiate Network Reconnaissance & Device Profiling</h3>
                     <p>Enter target hostname, IPv4 address, or CIDR network block (e.g., 192.168.1.0/24)</p>
                 </div>
                 
@@ -45,6 +45,21 @@
                             <option value="UDP">UDP Probing (DNS, SNMP, NTP)</option>
                             <option value="SYN">SYN Stealth (Raw Sockets)</option>
                             <option value="COMBINED">Combined (TCP + UDP Dual Sweep)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="profile-select">Device Scan Profile</label>
+                        <select id="profile-select">
+                            <option value="ALL" selected>All Targeted Ports (Standard)</option>
+                            <option value="AUTO">✨ Auto Device Profiling (Smart Detect)</option>
+                            <option value="ROUTER">🛜 Router / Gateway Profile</option>
+                            <option value="PRINTER">📠 Printer / MFD Profile</option>
+                            <option value="IOT">📱 IoT / Smart Device Profile</option>
+                            <option value="NAS">💾 NAS / Storage Server Profile</option>
+                            <option value="DATABASE">🗄️ Database Server Profile</option>
+                            <option value="WEB">🌐 Web Server Profile</option>
+                            <option value="WORKSTATION">💻 Workstation / PC Profile</option>
                         </select>
                     </div>
 
@@ -76,7 +91,7 @@
             <!-- Metrics Summary Grid -->
             <section class="metrics-row" id="metrics-section" style="display: none;">
                 <div class="metric-box">
-                    <span class="m-label">Live Hosts</span>
+                    <span class="m-label">Live Devices</span>
                     <span class="m-val purple" id="m-hosts">0</span>
                 </div>
                 <div class="metric-box">
@@ -100,8 +115,8 @@
                 <!-- Discovered Hosts & Services -->
                 <section class="glass-card main-results">
                     <div class="card-header">
-                        <h3>🔍 Discovered Network Findings</h3>
-                        <p>Live active ports, service banner signatures, and CVE threat matches</p>
+                        <h3>🔍 Discovered Device Findings</h3>
+                        <p>Device classification badges, open ports, banners, and security vulnerabilities</p>
                     </div>
                     <div id="results-display" class="results-container">
                         <div class="empty-state">
@@ -117,7 +132,7 @@
                         <h3>📜 Live Console Log</h3>
                     </div>
                     <div class="terminal-log" id="terminal-feed">
-                        <div class="log-line">[SYSTEM] PortVision v2.0 GUI Engine Ready.</div>
+                        <div class="log-line">[SYSTEM] PortVision Device Profiling Engine Ready.</div>
                     </div>
 
                     <div class="card-header" style="margin-top: 24px;">

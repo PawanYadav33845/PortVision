@@ -13,15 +13,16 @@ from typing import List, Optional
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 from src.utils.helpers import parse_network_range, get_common_ports, get_udp_ports
-from src.core.discovery import run_network_sweep, ping_host
+from src.core.discovery import run_network_sweep
 from src.core.scanner import run_port_scan
 from src.core.os_detect import detect_os_from_ttl
+from src.core.device_profile import classify_device_type, DEVICE_ICONS
 from src.reporter.html_report import generate_html_executive_report
 from src.reporter.report_gen import generate_markdown_report
 from src.reporter.json_export import export_results_to_json
 from src.utils.alerts import send_webhook_alert
 
-app = FastAPI(title="PortVision Modern Recon Dashboard", version="2.5.0")
+app = FastAPI(title="PortVision Modern Recon Dashboard", version="2.8.0")
 
 STATIC_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "static"))
 REPORTS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../reports"))
@@ -42,6 +43,7 @@ active_scan_state = {
 class ScanRequest(BaseModel):
     target: str
     scan_mode: str = "TCP"  # TCP, UDP, SYN, COMBINED
+    profile: str = "ALL"    # ALL, ROUTER, PRINTER, IOT, NAS, DATABASE, WEB, WORKSTATION, AUTO
     lookup_cves: bool = True
     concurrency: int = 100
     webhook_url: Optional[str] = None
@@ -68,14 +70,14 @@ async def start_scan(req: ScanRequest, background_tasks: BackgroundTasks):
         "status": "Scanning",
         "progress": 5,
         "current_target": req.target,
-        "logs": [f"[{datetime.now().strftime('%H:%M:%S')}] Launching reconnaissance against: {req.target} ({req.scan_mode} mode, concurrency={req.concurrency})"],
+        "logs": [f"[{datetime.now().strftime('%H:%M:%S')}] Launching reconnaissance against: {req.target} ({req.scan_mode} mode, profile={req.profile})"],
         "results": None
     }
 
-    background_tasks.add_task(execute_scan_pipeline, req.target, req.scan_mode, req.lookup_cves, req.concurrency, req.webhook_url)
+    background_tasks.add_task(execute_scan_pipeline, req.target, req.scan_mode, req.profile, req.lookup_cves, req.concurrency, req.webhook_url)
     return {"status": "success", "message": "Reconnaissance scan initiated successfully."}
 
-async def execute_scan_pipeline(target_input: str, scan_mode: str, lookup_cves: bool, concurrency: int, webhook_url: Optional[str]):
+async def execute_scan_pipeline(target_input: str, scan_mode: str, profile: str, lookup_cves: bool, concurrency: int, webhook_url: Optional[str]):
     global active_scan_state
     try:
         candidate_ips = parse_network_range(target_input)
@@ -105,19 +107,31 @@ async def execute_scan_pipeline(target_input: str, scan_mode: str, lookup_cves: 
         step_progress = 60 / max(len(alive_hosts), 1)
 
         for host_ip in alive_hosts:
-            active_scan_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Probing {host_ip} ({scan_mode} mode)...")
-            scan_results = await run_port_scan(host_ip, ports_to_scan=[], scan_mode=scan_mode, lookup_cves=lookup_cves, max_concurrency=concurrency)
+            active_scan_state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] Probing {host_ip} ({scan_mode} mode, profile={profile})...")
+            scan_results = await run_port_scan(
+                host_ip, 
+                ports_to_scan=[], 
+                scan_mode=scan_mode, 
+                lookup_cves=lookup_cves, 
+                max_concurrency=concurrency,
+                profile=profile
+            )
             
-            # Simple TTL OS detection estimate (default TTL ~128 for Windows, ~64 for Linux)
             os_data = detect_os_from_ttl(128 if host_ip.startswith("127.") or host_ip.startswith("192.") else 64)
-
+            
             open_findings = [r for r in scan_results if "Open" in r.get("status", "")]
             open_count = len(open_findings)
+
+            open_ports_list = [f.get("port") for f in open_findings]
+            all_banners = " ".join([f.get("banner", "") for f in open_findings if f.get("banner")])
+            classified_type = classify_device_type(open_ports_list, all_banners)
             
             if open_count > 0:
                 generate_markdown_report(host_ip, scan_results)
 
             session_capture["network_discoveries"][host_ip] = {
+                "device_classification": classified_type,
+                "device_badge": DEVICE_ICONS.get(classified_type, classified_type),
                 "os_fingerprint": os_data,
                 "open_ports_detected": open_count,
                 "findings": open_findings

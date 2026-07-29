@@ -94,7 +94,7 @@ PortVision/
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/your-username/PortVision.git
+git clone https://github.com/PawanYadav33845/PortVision.git
 cd PortVision
 ```
 

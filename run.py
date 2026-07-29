@@ -21,6 +21,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 from src.utils.helpers import parse_network_range, get_common_ports, get_udp_ports
 from src.core.discovery import run_network_sweep
 from src.core.scanner import run_port_scan
+from src.core.device_profile import classify_device_type, DEVICE_ICONS
 from src.reporter.report_gen import generate_markdown_report
 from src.reporter.html_report import generate_html_executive_report
 from src.reporter.json_export import export_results_to_json
@@ -47,7 +48,7 @@ def launch_gui_server(host: str = "127.0.0.1", port: int = 8000):
     import uvicorn
     uvicorn.run("src.gui.app:app", host=host, port=target_port, reload=False)
 
-async def run_cli_scan(user_input: str, scan_mode: str, lookup_cves: bool):
+async def run_cli_scan(user_input: str, scan_mode: str, profile: str, lookup_cves: bool):
     try:
         # 1. Target Expansion
         candidate_ips = parse_network_range(user_input)
@@ -79,7 +80,7 @@ async def run_cli_scan(user_input: str, scan_mode: str, lookup_cves: bool):
 
         # 3. Active Scanning Loop
         for host_ip in alive_hosts:
-            console.print(f"\n[bold magenta]▼ Scanning Host: {host_ip} ({scan_mode} mode)[/bold magenta]")
+            console.print(f"\n[bold magenta]▼ Scanning Host: {host_ip} ({scan_mode} mode, profile={profile})[/bold magenta]")
 
             with Progress(
                 SpinnerColumn("dots", speed=1.2),
@@ -88,10 +89,33 @@ async def run_cli_scan(user_input: str, scan_mode: str, lookup_cves: bool):
                 console=console
             ) as progress:
                 progress.add_task(description=f"[dim cyan]Probing ports on {host_ip}...[/dim cyan]", total=None)
-                scan_results = await run_port_scan(host_ip, ports_to_scan=[], scan_mode=scan_mode, lookup_cves=lookup_cves)
+                scan_results = await run_port_scan(
+                    host_ip, 
+                    ports_to_scan=[], 
+                    scan_mode=scan_mode, 
+                    lookup_cves=lookup_cves,
+                    profile=profile
+                )
+
+            open_count = 0
+            host_json_log = []
+            open_ports_list = []
+            all_banners = []
+
+            for record in scan_results:
+                status = record.get("status", "Closed")
+                if "Open" in status:
+                    open_count += 1
+                    open_ports_list.append(record["port"])
+                    if record.get("banner"):
+                        all_banners.append(record["banner"])
+                    host_json_log.append(record)
+
+            classified_type = classify_device_type(open_ports_list, " ".join(all_banners))
+            dev_badge = DEVICE_ICONS.get(classified_type, classified_type)
 
             # Build Terminal Summary Table
-            table = Table(title=f"Service Findings for {host_ip}", title_style="bold green", border_style="dim")
+            table = Table(title=f"Service Findings for {host_ip} [{dev_badge}]", title_style="bold green", border_style="dim")
             table.add_column("PORT", style="cyan")
             table.add_column("PROTO", style="blue")
             table.add_column("STATUS")
@@ -100,40 +124,34 @@ async def run_cli_scan(user_input: str, scan_mode: str, lookup_cves: bool):
             table.add_column("BANNER / METADATA", style="italic dim")
             table.add_column("SECURITY ANALYSIS")
 
-            open_count = 0
-            host_json_log = []
+            for record in host_json_log:
+                vuln_display = "[green]✔ Clean[/green]"
+                vuln = record.get("vulnerability")
+                if vuln:
+                    sev = vuln.get("severity", "Medium")
+                    color = "red" if sev in ["High", "Critical"] else "yellow"
+                    cve_tag = f"[{vuln.get('cve_id')}] " if vuln.get("cve_id") else ""
+                    vuln_display = f"[{color}]⚠️ {cve_tag}{vuln['title']}[/{color}]"
 
-            for record in scan_results:
-                status = record.get("status", "Closed")
-                if "Open" in status:
-                    open_count += 1
-                    vuln_display = "[green]✔ Clean[/green]"
-                    
-                    vuln = record.get("vulnerability")
-                    if vuln:
-                        sev = vuln.get("severity", "Medium")
-                        color = "red" if sev in ["High", "Critical"] else "yellow"
-                        cve_tag = f"[{vuln.get('cve_id')}] " if vuln.get("cve_id") else ""
-                        vuln_display = f"[{color}]⚠️ {cve_tag}{vuln['title']}[/{color}]"
-
-                    table.add_row(
-                        str(record["port"]),
-                        record.get("protocol", "TCP"),
-                        f"[bold green]{status.upper()}[/bold green]",
-                        record.get("service", "Unknown"),
-                        record.get("category", "General"),
-                        record.get("banner") or "None",
-                        vuln_display
-                    )
-                    host_json_log.append(record)
+                table.add_row(
+                    str(record["port"]),
+                    record.get("protocol", "TCP"),
+                    f"[bold green]{record.get('status', 'OPEN').upper()}[/bold green]",
+                    record.get("service", "Unknown"),
+                    record.get("category", "General"),
+                    record.get("banner") or "None",
+                    vuln_display
+                )
 
             if open_count > 0:
                 console.print(table)
                 generate_markdown_report(host_ip, scan_results)
             else:
-                console.print(f"[dim yellow][*] Host {host_ip} responded to ping but has 0 open targeted ports.[/dim yellow]")
+                console.print(f"[dim yellow][*] Host {host_ip} ({dev_badge}) responded to ping but hosts 0 open ports for profile '{profile}'.[/dim yellow]")
 
             session_capture["network_discoveries"][host_ip] = {
+                "device_classification": classified_type,
+                "device_badge": dev_badge,
                 "open_ports_detected": open_count,
                 "findings": host_json_log
             }
@@ -151,10 +169,11 @@ async def run_cli_scan(user_input: str, scan_mode: str, lookup_cves: bool):
         console.print(f"\n[bold red][-] Exception Error Encountered: {err}[/bold red]")
 
 def main():
-    parser = argparse.ArgumentParser(description="PortVision Multi-Protocol Reconnaissance & Threat Suite")
+    parser = argparse.ArgumentParser(description="PortVision Multi-Protocol Reconnaissance & Device Profiling Suite")
     parser.add_argument("--gui", action="store_true", help="Launch the Web GUI interface")
     parser.add_argument("--target", type=str, help="Target host, IP, or CIDR range (e.g. 192.168.1.0/24)")
     parser.add_argument("--mode", type=str, choices=["TCP", "UDP", "SYN", "COMBINED"], default="TCP", help="Scanning protocol mode")
+    parser.add_argument("--profile", type=str, choices=["ALL", "AUTO", "ROUTER", "PRINTER", "IOT", "NAS", "DATABASE", "WEB", "WORKSTATION"], default="ALL", help="Target device scan profile")
     parser.add_argument("--no-cve", action="store_true", help="Disable live online CVE API lookups")
     args = parser.parse_args()
 
@@ -164,8 +183,8 @@ def main():
 
     console.print(
         Panel.fit(
-            "[bold cyan]👁️ PORTVISION v2.0 [/bold cyan]\n"
-            "[dim]Asynchronous Multi-Protocol Discovery, SYN Stealth, UDP Probing & Live CVE Suite[/dim]",
+            "[bold cyan]👁️ PORTVISION v2.8 [/bold cyan]\n"
+            "[dim]Multi-Protocol Discovery, SYN Stealth, Device Profiling & Live CVE Suite[/dim]",
             border_style="cyan",
             padding=(1, 4)
         )
@@ -179,6 +198,8 @@ def main():
             return
 
     scan_mode = args.mode
+    profile = args.profile
+
     if not args.target:
         console.print("\n[bold cyan]Select Protocol Scanning Mode:[/bold cyan]")
         console.print("  [white]1.[/white] TCP Connect Scan (Default)")
@@ -201,7 +222,7 @@ def main():
             scan_mode = "TCP"
 
     lookup_cves = not args.no_cve
-    asyncio.run(run_cli_scan(user_input, scan_mode, lookup_cves))
+    asyncio.run(run_cli_scan(user_input, scan_mode, profile, lookup_cves))
 
 if __name__ == "__main__":
     try:

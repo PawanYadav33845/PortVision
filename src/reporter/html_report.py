@@ -1,11 +1,12 @@
 import os
 import json
 from datetime import datetime
+from src.core.device_profile import classify_device_type, DEVICE_ICONS
 
 def generate_html_executive_report(session_data: dict) -> str:
     """
     Renders a modern, single-file HTML executive dashboard report from scan session metrics.
-    Includes OS fingerprinting metrics, Web/TLS certificate audit details, and severity badges.
+    Includes Device Type Classification badges, OS fingerprinting metrics, and Web/TLS audit details.
     """
     reports_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../reports"))
     os.makedirs(reports_dir, exist_ok=True)
@@ -157,6 +158,16 @@ def generate_html_executive_report(session_data: dict) -> str:
             border: 1px solid rgba(168, 85, 247, 0.3);
         }}
 
+        .dev-badge {{
+            background: rgba(56, 189, 248, 0.15);
+            color: var(--accent-cyan);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            border: 1px solid rgba(56, 189, 248, 0.3);
+        }}
+
         table {{ width: 100%; border-collapse: collapse; text-align: left; }}
         th {{
             background: rgba(15, 23, 42, 0.6);
@@ -253,12 +264,18 @@ def generate_html_executive_report(session_data: dict) -> str:
         open_count = host_info.get("open_ports_detected", 0)
         os_data = host_info.get("os_fingerprint") or {"os_family": "Generic Host"}
 
+        open_ports_list = [f.get("port") for f in findings if f.get("port")]
+        all_banners = " ".join([f.get("banner", "") for f in findings if f.get("banner")])
+        classified_type = classify_device_type(open_ports_list, all_banners)
+        dev_badge_text = DEVICE_ICONS.get(classified_type, classified_type)
+
         html_content += f"""
         <div class="host-card">
             <div class="host-header">
                 <div>
                     <span class="host-ip">🖥️ Target Host: {host_ip}</span>
-                    <span class="os-badge" style="margin-left: 12px;">💻 OS: {os_data.get('os_family')}</span>
+                    <span class="dev-badge" style="margin-left: 10px;">{dev_badge_text}</span>
+                    <span class="os-badge" style="margin-left: 6px;">💻 OS: {os_data.get('os_family')}</span>
                 </div>
                 <div class="meta-pill">{open_count} Open Ports</div>
             </div>

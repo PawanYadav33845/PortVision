@@ -1,6 +1,7 @@
 document.addEventListener("DOMContentLoaded", () => {
     const targetInput = document.getElementById("target-input");
     const modeSelect = document.getElementById("mode-select");
+    const profileSelect = document.getElementById("profile-select");
     const cveToggle = document.getElementById("cve-toggle");
     const startBtn = document.getElementById("start-scan-btn");
 
@@ -41,6 +42,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 body: JSON.stringify({
                     target: target,
                     scan_mode: modeSelect.value,
+                    profile: profileSelect.value,
                     lookup_cves: cveToggle.checked
                 })
             });
@@ -51,7 +53,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 return;
             }
 
-            // Start status polling
             pollInterval = setInterval(checkStatus, 1000);
         } catch (err) {
             alert("Failed to connect to backend engine.");
@@ -64,11 +65,9 @@ document.addEventListener("DOMContentLoaded", () => {
             const res = await fetch("/api/status");
             const state = await res.json();
 
-            // Update progress
             progressFill.style.width = `${state.progress}%`;
             progressPct.innerText = `${Math.round(state.progress)}%`;
 
-            // Update terminal logs
             if (state.logs && state.logs.length) {
                 terminalFeed.innerHTML = state.logs.map(l => `<div class="log-line">${l}</div>`).join("");
                 terminalFeed.scrollTop = terminalFeed.scrollHeight;
@@ -99,15 +98,19 @@ document.addEventListener("DOMContentLoaded", () => {
         const discoveries = results.network_discoveries || {};
         for (const [hostIp, hostInfo] of Object.entries(discoveries)) {
             const findings = hostInfo.findings || [];
+            const devBadge = hostInfo.device_badge || hostInfo.device_classification || "Generic Host";
             totalPorts += hostInfo.open_ports_detected || 0;
 
             htmlContent += `
                 <div style="margin-bottom: 20px; background: rgba(15, 23, 42, 0.6); padding: 16px; border-radius: 12px; border: 1px solid var(--border-card);">
-                    <h4 style="color: var(--accent-cyan); margin-bottom: 10px;">🖥️ Host: ${hostIp} (${hostInfo.open_ports_detected} Open Ports)</h4>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                        <h4 style="color: var(--accent-cyan);">Host: ${hostIp} (${hostInfo.open_ports_detected} Open Ports)</h4>
+                        <span style="background: rgba(56, 189, 248, 0.15); color: var(--accent-cyan); padding: 4px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; border: 1px solid rgba(56, 189, 248, 0.3);">${devBadge}</span>
+                    </div>
             `;
 
             if (!findings.length) {
-                htmlContent += `<p style="color: var(--text-secondary); font-size: 0.85rem;">Zero open targeted ports detected on this host.</p>`;
+                htmlContent += `<p style="color: var(--text-secondary); font-size: 0.85rem;">Zero open targeted ports detected on this device.</p>`;
             } else {
                 htmlContent += `
                     <table>
@@ -156,7 +159,6 @@ document.addEventListener("DOMContentLoaded", () => {
         mVulns.innerText = totalRisks;
         resultsDisplay.innerHTML = htmlContent || `<p>No host findings.</p>`;
 
-        // Add download buttons
         if (results.reports) {
             reportDownloadPills.innerHTML = `
                 <a href="/api/reports/download/${results.reports.html_report}" target="_blank" class="btn-primary" style="padding: 6px 12px; font-size: 0.8rem;">📄 HTML Report</a>
